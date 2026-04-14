@@ -6,6 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A7655ABC2F8D961800AD832D /* libproject-swifties.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A7655AA72F89B63000AD832D /* libproject-swifties.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A7655ABD2F8D961800AD832D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A7655A9F2F89B63000AD832D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A7655AA62F89B63000AD832D;
+			remoteInfo = "project-swifties";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		A7655AA52F89B63000AD832D /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -20,12 +34,18 @@
 
 /* Begin PBXFileReference section */
 		A7655AA72F89B63000AD832D /* libproject-swifties.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libproject-swifties.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A7655AB82F8D961800AD832D /* SwiftiesTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftiesTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A7655AA92F89B63000AD832D /* project-swifties */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "project-swifties";
+			sourceTree = "<group>";
+		};
+		A7655AB92F8D961800AD832D /* SwiftiesTest */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SwiftiesTest;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -38,6 +58,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A7655AB52F8D961800AD832D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A7655ABC2F8D961800AD832D /* libproject-swifties.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -45,6 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				A7655AA92F89B63000AD832D /* project-swifties */,
+				A7655AB92F8D961800AD832D /* SwiftiesTest */,
 				A7655AA82F89B63000AD832D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -53,6 +82,7 @@
 			isa = PBXGroup;
 			children = (
 				A7655AA72F89B63000AD832D /* libproject-swifties.a */,
+				A7655AB82F8D961800AD832D /* SwiftiesTest.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,6 +112,29 @@
 			productReference = A7655AA72F89B63000AD832D /* libproject-swifties.a */;
 			productType = "com.apple.product-type.library.static";
 		};
+		A7655AB72F8D961800AD832D /* SwiftiesTest */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A7655ABF2F8D961800AD832D /* Build configuration list for PBXNativeTarget "SwiftiesTest" */;
+			buildPhases = (
+				A7655AB42F8D961800AD832D /* Sources */,
+				A7655AB52F8D961800AD832D /* Frameworks */,
+				A7655AB62F8D961800AD832D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A7655ABE2F8D961800AD832D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A7655AB92F8D961800AD832D /* SwiftiesTest */,
+			);
+			name = SwiftiesTest;
+			packageProductDependencies = (
+			);
+			productName = SwiftiesTest;
+			productReference = A7655AB82F8D961800AD832D /* SwiftiesTest.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -93,6 +146,9 @@
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					A7655AA62F89B63000AD832D = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					A7655AB72F8D961800AD832D = {
 						CreatedOnToolsVersion = 26.3;
 					};
 				};
@@ -112,9 +168,20 @@
 			projectRoot = "";
 			targets = (
 				A7655AA62F89B63000AD832D /* project-swifties */,
+				A7655AB72F8D961800AD832D /* SwiftiesTest */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A7655AB62F8D961800AD832D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A7655AA32F89B63000AD832D /* Sources */ = {
@@ -124,7 +191,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A7655AB42F8D961800AD832D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A7655ABE2F8D961800AD832D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A7655AA62F89B63000AD832D /* project-swifties */;
+			targetProxy = A7655ABD2F8D961800AD832D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A7655AAC2F89B63000AD832D /* Debug */ = {
@@ -278,6 +360,44 @@
 			};
 			name = Release;
 		};
+		A7655AC02F8D961800AD832D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BHS63AKYJX;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = haykisayan.SwiftiesTest;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A7655AC12F8D961800AD832D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BHS63AKYJX;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = haykisayan.SwiftiesTest;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -295,6 +415,15 @@
 			buildConfigurations = (
 				A7655AAF2F89B63000AD832D /* Debug */,
 				A7655AB02F89B63000AD832D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A7655ABF2F8D961800AD832D /* Build configuration list for PBXNativeTarget "SwiftiesTest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A7655AC02F8D961800AD832D /* Debug */,
+				A7655AC12F8D961800AD832D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
