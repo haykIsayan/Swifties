@@ -65,15 +65,21 @@ extension Dispatcher {
     static var contextKey: Any.Type { Dispatcher.self }  // all dispatchers share one slot
 }
 
-struct MainDispatcher: Dispatcher {
+struct DispatcherMain: Dispatcher {
     func dispatch(block: @escaping DispatchBlock) {
         DispatchQueue.main.async(execute: block)
     }
 }
 
-struct BackgroundDispatcher: Dispatcher {
+struct DispatcherIO: Dispatcher {
     func dispatch(block: @escaping DispatchBlock) {
-        DispatchQueue.global().async(execute: block)
+        DispatchQueue.global(qos: .utility).async(execute: block)
+    }
+}
+
+struct DispatcherDefault: Dispatcher {
+    func dispatch(block: @escaping DispatchBlock) {
+        DispatchQueue.global(qos: .userInitiated).async(execute: block)
     }
 }
 
@@ -276,18 +282,14 @@ actor SwiftieScope {
         let job = Job(parent: nil)
         var base = context + job
         if context[Dispatcher.self] == nil {
-            base = base + BackgroundDispatcher()
+            base = base + DispatcherDefault()
         }
         self.context = base
     }
     
     @discardableResult
     func launch(block: @escaping ScopeBlock) async throws -> Job {
-        let newJob = Job(parent: rootJob)
-        guard await rootJob.addChild(newJob) else {
-            throw SwiftieError.cancellation
-        }
-        await newJob.start()
+        let newJob = try await createAndStartJob()
         
         // put it together ^
         scopeDispatcher.dispatch {
@@ -300,11 +302,7 @@ actor SwiftieScope {
     }
     
     func asynchron<T>(block: @escaping () async throws -> T) async throws -> Deferred<T> {
-        let newJob = Job(parent: rootJob)
-        guard await rootJob.addChild(newJob) else {
-            throw SwiftieError.cancellation
-        }
-        await newJob.start()
+        let newJob = try await createAndStartJob()
         
         // put it together ^
         let deferred = Deferred<T>(job: newJob)
