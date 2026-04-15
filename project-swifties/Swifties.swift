@@ -258,7 +258,7 @@ enum JobEvent {
  SWIFTIE SCOPE
  */
 
-typealias ScopeBlock = () async -> Void
+typealias LaunchBlock = (SwiftieScope) async throws -> Void
 
 actor SwiftieScope {
     
@@ -287,30 +287,43 @@ actor SwiftieScope {
         self.context = base
     }
     
+    private init(context: SwiftieContext, job: Job) {
+        var base = context + job
+        if context[Dispatcher.self] == nil {
+            base = base + DispatcherDefault()
+        }
+        self.context = base
+    }
+    
     @discardableResult
-    func launch(block: @escaping ScopeBlock) async throws -> Job {
+    func launch(block: @escaping LaunchBlock) async throws -> Job {
         let newJob = try await createAndStartJob()
+        let childScope = createChildScope(with: newJob)
         
-        // put it together ^
         scopeDispatcher.dispatch {
             Task {
-                await block()
-                await newJob.complete()
+                do {
+                    try await block(childScope)
+                    await newJob.complete()
+                } catch {
+                    await newJob.complete()  // complete even on failure
+                    // TODO: propagate to parent when SupervisorJob is implemented
+                }
             }
         }
         return newJob
     }
     
-    func asynchron<T>(block: @escaping () async throws -> T) async throws -> Deferred<T> {
+    func asynchron<T>(block: @escaping (SwiftieScope) async throws -> T) async throws -> Deferred<T> {
         let newJob = try await createAndStartJob()
-        
-        // put it together ^
+        let childScope = createChildScope(with: newJob)
+    
         let deferred = Deferred<T>(job: newJob)
-
+        
         scopeDispatcher.dispatch {
             Task {
                 do {
-                    let result = try await block()
+                    let result = try await block(childScope)
                     await newJob.complete()
                     await deferred.complete(with: .success(result))
                 } catch {
@@ -330,6 +343,12 @@ actor SwiftieScope {
         }
         await newJob.start()
         return newJob
+    }
+    
+    private func createChildScope(with childJob: Job) -> SwiftieScope {
+        let childContext = self.context
+        let childScope = SwiftieScope(context: childContext, job: childJob)
+        return childScope
     }
     
     func cancel() async {
