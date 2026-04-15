@@ -52,6 +52,14 @@ func + (lhs: some ContextElement, rhs: SwiftieContext) -> SwiftieContext {
 }
 
 /**
+ SWIFTIE NAME
+ */
+
+struct SwiftieName: ContextElement {
+    let name: String
+}
+
+/**
  DISPATCHER
  */
 
@@ -77,7 +85,7 @@ struct DispatcherIO: Dispatcher {
     }
 }
 
-struct DispatcherDefault: Dispatcher {
+struct DispatcherGeneral: Dispatcher {
     func dispatch(block: @escaping DispatchBlock) {
         DispatchQueue.global(qos: .userInitiated).async(execute: block)
     }
@@ -87,6 +95,13 @@ struct UnconfinedDispatcher: Dispatcher {
     func dispatch(block: @escaping DispatchBlock) {
         block()
     }
+}
+
+enum Dispatchers {
+    static let main = SwiftieContext(DispatcherMain())
+    static let io = SwiftieContext(DispatcherIO())
+    static let general = SwiftieContext(DispatcherGeneral())
+    static let unconfined = SwiftieContext(UnconfinedDispatcher())
 }
 
 /**
@@ -282,7 +297,7 @@ actor SwiftieScope {
         let job = Job(parent: nil)
         var base = context + job
         if context[Dispatcher.self] == nil {
-            base = base + DispatcherDefault()
+            base = base + DispatcherGeneral()
         }
         self.context = base
     }
@@ -290,7 +305,7 @@ actor SwiftieScope {
     private init(context: SwiftieContext, job: Job) {
         var base = context + job
         if context[Dispatcher.self] == nil {
-            base = base + DispatcherDefault()
+            base = base + DispatcherGeneral()
         }
         self.context = base
     }
@@ -334,6 +349,18 @@ actor SwiftieScope {
         }
         
         return deferred
+    }
+    
+    func withContext<T>(
+        context newContext: SwiftieContext,
+        block: @escaping (SwiftieScope) async throws -> T
+    ) async throws -> T {
+        let initialContext = self.context
+        let mergedContext = initialContext + newContext
+        let childScope = SwiftieScope(context: mergedContext)
+        let deferred = try await childScope.asynchron(block: block)
+        let result = try await deferred.value()
+        return result
     }
     
     private func createAndStartJob() async throws -> Job {

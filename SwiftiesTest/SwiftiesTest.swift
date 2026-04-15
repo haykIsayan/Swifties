@@ -11,7 +11,7 @@ import Testing
 struct SwiftieTests {
     
     @Test func launchExecutesBlock() async throws {
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         var executed = false
         let job = try await scope.launch { _ in executed = true }
         await job.join()  // wait for block to finish
@@ -19,14 +19,14 @@ struct SwiftieTests {
     }
 
     @Test func launchAddsChildToScope() async throws {
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         let job = try await scope.launch { _ in }
         await job.join()
         #expect(await scope.rootJob.childCount == 1)
     }
     
     @Test func deferredReturnsValue() async throws {
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         let deferred = try await scope.asynchron { _ in 42 }
         let result = try await deferred.value()
         #expect(result == 42)
@@ -34,7 +34,7 @@ struct SwiftieTests {
     }
     
     @Test func multipleWaitingDeferreds() async throws {
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         let deferred = try await scope.asynchron { _ in 42 }
         async let a = deferred.value()
         async let b = deferred.value()
@@ -43,7 +43,7 @@ struct SwiftieTests {
     }
     
     @Test func deferredResultIsCached() async throws {
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         let deferred = try await scope.asynchron { _ in 42 }
         let first = try await deferred.value()
         let second = try await deferred.value()
@@ -51,7 +51,7 @@ struct SwiftieTests {
     }
     
     @Test func concurrentDeferred() async throws {
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         let a = try await scope.asynchron { _ in 1 }
         let b = try await scope.asynchron { _ in 2 }
         #expect(try await a.value() + b.value() == 3)
@@ -60,7 +60,7 @@ struct SwiftieTests {
     // 3. Error propagation
     @Test func deferredPropagatesError() async throws {
         struct TestError: Error {}
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         let deferred = try await scope.asynchron { _ in throw TestError() }
         await #expect(throws: TestError.self) {
             try await deferred.value()
@@ -70,7 +70,7 @@ struct SwiftieTests {
 
     // 4. Cancellation
     @Test func cancellationStopsAsynchronJob() async throws {
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         await scope.cancel()
         
         await #expect(throws: SwiftieError.cancellation) {
@@ -80,12 +80,65 @@ struct SwiftieTests {
     }
     
     @Test func cancellationStopsLaunchedJob() async throws {
-        let scope = SwiftieScope(context: SwiftieContext() + DispatcherDefault())
+        let scope = SwiftieScope(context: SwiftieContext() + Dispatchers.general)
         await scope.cancel()
         
         await #expect(throws: SwiftieError.cancellation) {
             try await scope.launch { _ in }
         }
         #expect(await scope.rootJob.isCanceled)
+    }
+    
+    @Test func withContextSwitchesDispatcher() async throws {
+        let scope = SwiftieScope(context: Dispatchers.general)
+        
+        var dispatcherInsideBlock: (any Dispatcher)? = nil
+        
+        try await scope.withContext(context: Dispatchers.io) { innerScope in
+            dispatcherInsideBlock = await innerScope.context[Dispatcher.self]
+        }
+        
+        #expect(dispatcherInsideBlock is DispatcherIO)
+    }
+    
+    @Test func childScopeInheritsParentContext() async throws {
+        let ctx = Dispatchers.general + SwiftieName(name: "parent")
+        let scope = SwiftieScope(context: ctx)
+        var nameInsideBlock: String? = nil
+        
+        let job = try await scope.launch { childScope in
+            nameInsideBlock = await childScope.context[SwiftieName.self]?.name
+        }
+        await job.join()
+        
+        #expect(nameInsideBlock == "parent")
+    }
+    
+    @Test func nestedWithContextInnermostWins() async throws {
+        let scope = SwiftieScope(context: Dispatchers.general)
+        var innermostDispatcher: (any Dispatcher)? = nil
+        
+        let job = try await scope.launch { scope in
+            try await scope.withContext(context: Dispatchers.io) { scope in
+                try await scope.withContext(context: Dispatchers.main) { scope in
+                    innermostDispatcher = await scope.context[Dispatcher.self]
+                }
+            }
+        }
+        await job.join()
+        #expect(innermostDispatcher is DispatcherMain)
+    }
+    
+    @Test func dispatcherRestoredAfterWithContext() async throws {
+        let scope = SwiftieScope(context: Dispatchers.general)
+        
+        let job = try await scope.launch { scope in
+            try await scope.withContext(context: Dispatchers.io) { innerScope in
+                
+            }
+        }
+        await job.join()
+        let dispatcherAfter = await scope.context[Dispatcher.self]
+        #expect(dispatcherAfter is DispatcherGeneral)
     }
 }
