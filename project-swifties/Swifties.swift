@@ -245,6 +245,14 @@ actor Job: ContextElement {
         return true
     }
     
+    fileprivate func notifyChildFailed() async {
+        guard let parent else {
+            await cancel()
+            return
+        }
+        await parent.notifyChildFailed()
+    }
+    
     func join() async {
         if state == .completed || state == .canceled { return }
         await withCheckedContinuation { continuation in
@@ -321,8 +329,8 @@ actor SwiftieScope {
                     try await block(childScope)
                     await newJob.complete()
                 } catch {
-                    await newJob.complete()  // complete even on failure
-                    // TODO: propagate to parent when SupervisorJob is implemented
+                    await newJob.complete()
+                    await newJob.parent?.notifyChildFailed()
                 }
             }
         }
@@ -343,6 +351,7 @@ actor SwiftieScope {
                     await deferred.complete(with: .success(result))
                 } catch {
                     await newJob.complete()
+                    await newJob.parent?.notifyChildFailed()
                     await deferred.complete(with: .failure(error))
                 }
             }

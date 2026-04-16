@@ -141,4 +141,22 @@ struct SwiftieTests {
         let dispatcherAfter = await scope.context[Dispatcher.self]
         #expect(dispatcherAfter is DispatcherGeneral)
     }
+    
+    @Test func childFailureCancelsScope() async throws {
+        let scope = SwiftieScope(context: Dispatchers.general)
+        
+        let failingJob = try await scope.launch { _ in
+            throw SwiftieError.failure
+        }
+        let siblingJob = try await scope.launch { _ in
+            try await Task.sleep(for: .seconds(2))
+        }
+        
+        await failingJob.join()
+        await siblingJob.join()
+        
+        #expect(await scope.rootJob.isCanceled)
+        #expect(await failingJob.isCompleted)  // ← add
+        #expect(await siblingJob.isCanceled)  // ← add
+    }
 }
