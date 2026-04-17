@@ -63,45 +63,54 @@ struct SwiftieName: ContextElement {
  DISPATCHER
  */
 
-typealias DispatchBlock = () -> Void
+typealias SwiftieDispatchBlock = @Sendable () async throws -> Void
 
-protocol Dispatcher: ContextElement {
-    func dispatch(block: @escaping DispatchBlock)
+protocol SwiftieDispatcher: ContextElement {
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error>
 }
 
-extension Dispatcher {
-    static var contextKey: Any.Type { Dispatcher.self }  // all dispatchers share one slot
+extension SwiftieDispatcher {
+    static var contextKey: Any.Type { SwiftieDispatcher.self }
 }
 
-struct DispatcherMain: Dispatcher {
-    func dispatch(block: @escaping DispatchBlock) {
-        DispatchQueue.main.async(execute: block)
+struct SwiftieDispatcherIO: SwiftieDispatcher {
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error> {
+        return Task(priority: .utility) {
+            try await block()
+        }
     }
 }
 
-struct DispatcherIO: Dispatcher {
-    func dispatch(block: @escaping DispatchBlock) {
-        DispatchQueue.global(qos: .utility).async(execute: block)
+struct SwiftieDispatcherMain: SwiftieDispatcher {
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error> {
+        return Task { @MainActor in
+            try await block()
+        }
     }
 }
 
-struct DispatcherGeneral: Dispatcher {
-    func dispatch(block: @escaping DispatchBlock) {
-        DispatchQueue.global(qos: .userInitiated).async(execute: block)
+struct SwiftieDispatcherDefault: SwiftieDispatcher {
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error> {
+        return Task(priority: .userInitiated) {
+            try await block()
+        }
     }
 }
 
-struct UnconfinedDispatcher: Dispatcher {
-    func dispatch(block: @escaping DispatchBlock) {
-        block()
+
+struct SwiftieDispatcherUnconfined: SwiftieDispatcher {
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error> {
+        return Task {
+            try await block()
+        }
     }
 }
 
-enum Dispatchers {
-    static let main = SwiftieContext(DispatcherMain())
-    static let io = SwiftieContext(DispatcherIO())
-    static let general = SwiftieContext(DispatcherGeneral())
-    static let unconfined = SwiftieContext(UnconfinedDispatcher())
+enum SwiftieDispatchers {
+    static let main = SwiftieContext(SwiftieDispatcherMain())
+    static let io = SwiftieContext(SwiftieDispatcherIO())
+    static let general = SwiftieContext(SwiftieDispatcherDefault())
+    static let unconfined = SwiftieContext(SwiftieDispatcherUnconfined())
 }
 
 /**
@@ -177,9 +186,11 @@ actor Job: ContextElement {
 
     private var joinContinuations: [CheckedContinuation<Void, Never>] = []
     
+    private var task: Task<Void, Error>?
+    
     var isCompleted: Bool { state == .completed }
     
-    var isCanceled: Bool { state == .canceled }
+    var isCanceled: Bool { state == .canceled && (task == nil || task?.isCancelled == true) }
     
     var childCount: Int { children.count }
     
@@ -196,6 +207,11 @@ actor Job: ContextElement {
         return true
     }
     
+    func execute(block: @escaping SwiftieDispatchBlock, dispatcher: some SwiftieDispatcher) async {
+        self.task = dispatcher.dispatch {
+            try await block()
+        }
+    }
     
     @discardableResult
     func complete() async -> Bool {
@@ -217,6 +233,7 @@ actor Job: ContextElement {
     
     @discardableResult
     func cancel() async -> Bool {
+        task?.cancel()
         guard let cancelingState = interpret(trigger: .cancel, from: state) else {
             return false
         }
@@ -294,8 +311,8 @@ actor SwiftieScope {
         return job
     }
     
-    var scopeDispatcher: Dispatcher {
-        guard let dispatcher = context[Dispatcher.self] else {
+    var swiftieDispatcher: SwiftieDispatcher {
+        guard let dispatcher = context[SwiftieDispatcher.self] else {
             fatalError("SwiftieScope always requires a Dispatcher in context")
         }
         return dispatcher
@@ -304,16 +321,16 @@ actor SwiftieScope {
     init(context: SwiftieContext) {
         let job = Job(parent: nil)
         var base = context + job
-        if context[Dispatcher.self] == nil {
-            base = base + DispatcherGeneral()
+        if context[SwiftieDispatcher.self] == nil {
+            base = base + SwiftieDispatcherDefault()
         }
         self.context = base
     }
     
     private init(context: SwiftieContext, job: Job) {
         var base = context + job
-        if context[Dispatcher.self] == nil {
-            base = base + DispatcherGeneral()
+        if context[SwiftieDispatcher.self] == nil {
+            base = base + SwiftieDispatcherDefault()
         }
         self.context = base
     }
@@ -322,9 +339,8 @@ actor SwiftieScope {
     func launch(block: @escaping LaunchBlock) async throws -> Job {
         let newJob = try await createAndStartJob()
         let childScope = createChildScope(with: newJob)
-        
-        scopeDispatcher.dispatch {
-            Task {
+        await newJob.execute(
+            block: {
                 do {
                     try await block(childScope)
                     await newJob.complete()
@@ -332,8 +348,9 @@ actor SwiftieScope {
                     await newJob.complete()
                     await newJob.parent?.notifyChildFailed()
                 }
-            }
-        }
+            },
+            dispatcher: swiftieDispatcher
+        )
         return newJob
     }
     
@@ -343,8 +360,8 @@ actor SwiftieScope {
     
         let deferred = Deferred<T>(job: newJob)
         
-        scopeDispatcher.dispatch {
-            Task {
+        await newJob.execute(
+            block: {
                 do {
                     let result = try await block(childScope)
                     await newJob.complete()
@@ -354,8 +371,9 @@ actor SwiftieScope {
                     await newJob.parent?.notifyChildFailed()
                     await deferred.complete(with: .failure(error))
                 }
-            }
-        }
+            },
+            dispatcher: swiftieDispatcher
+        )
         
         return deferred
     }
