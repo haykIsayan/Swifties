@@ -64,7 +64,7 @@ struct SwiftieTests {
         await #expect(throws: TestError.self) {
             try await deferred.value()
         }
-        #expect(await deferred.isCompleted)
+        #expect(await deferred.isFailed)
     }
 
     // 4. Cancellation
@@ -145,6 +145,7 @@ struct SwiftieTests {
         let scope = SwiftieScope(context: SwiftieDispatchers.general)
         
         let failingJob = try await scope.launch { _ in
+            try await Task.sleep(for: .milliseconds(50))
             throw SwiftieError.failure
         }
         let siblingJob = try await scope.launch { _ in
@@ -154,8 +155,8 @@ struct SwiftieTests {
         await failingJob.join()
         await siblingJob.join()
         
-        #expect(await scope.rootJob.isCanceled)
-        #expect(await failingJob.isCompleted)  // ← add
+        #expect(await scope.rootJob.isFailed)
+        #expect(await failingJob.isFailed)  // ← add
         #expect(await siblingJob.isCanceled)  // ← add
     }
     

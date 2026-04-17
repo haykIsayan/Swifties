@@ -156,11 +156,13 @@ typealias JobStateMachine = [JobState: [JobEvent: JobState]]
 let jobStateMachine: JobStateMachine = [
     .new: [
         .start: .active,
-        .cancel: .canceling
+        .cancel: .canceling,
+        .fail: .failing
     ],
     .active: [
         .complete: .completing,
-        .cancel: .canceling
+        .cancel: .canceling,
+        .fail: .failing
     ],
     .completing: [
         .childrenCompleted: .completed,
@@ -169,6 +171,10 @@ let jobStateMachine: JobStateMachine = [
     .canceling: [
         .childrenCompleted: .canceled
     ],
+    .failing: [
+        .childrenCompleted: .failed
+    
+    ]
 ]
 
 func interpret(trigger event: JobEvent, from currentState: JobState) -> JobState? {
@@ -196,9 +202,13 @@ actor Job: ContextElement {
     
     private var task: Task<Void, Error>?
     
+    private var error: Error? = nil
+    
     var isCompleted: Bool { state == .completed }
     
     var isCanceled: Bool { state == .canceled && (task == nil || task?.isCancelled == true) }
+    
+    var isFailed: Bool { state == .failed }
     
     var childCount: Int { children.count }
     
@@ -229,7 +239,7 @@ actor Job: ContextElement {
         }
         state = completingState
         for child in children {
-            await child.complete()
+            await child.join()
         }
         guard let completedState = interpret(trigger: .childrenCompleted, from: state) else {
             return false
@@ -259,6 +269,24 @@ actor Job: ContextElement {
         return true
     }
     
+    func fail(error: Error) async {
+        self.error = error
+        guard let failingState = interpret(trigger: .fail, from: state) else {
+            return
+        }
+        state = failingState
+        for child in children {
+            await child.cancel()
+        }
+        guard let failedState = interpret(trigger: .childrenCompleted, from: state) else {
+            return
+        }
+        state = failedState
+        resumeAndCleanContinuations()
+        
+        await parent?.notifyChildFailed(error: error)
+    }
+    
     private func resumeAndCleanContinuations() {
         joinContinuations.forEach { $0.resume() }
         joinContinuations.removeAll()
@@ -271,18 +299,13 @@ actor Job: ContextElement {
         return true
     }
     
-    fileprivate func notifyChildFailed() async {
+    fileprivate func notifyChildFailed(error: Error) async {
         guard type != .supervisor else { return }
-        
-        guard let parent else {
-            await cancel()
-            return
-        }
-        await parent.notifyChildFailed()
+        await fail(error: error)
     }
     
     func join() async {
-        if state == .completed || state == .canceled { return }
+        if state == .completed || state == .canceled || state == .failed { return }
         await withCheckedContinuation { continuation in
             joinContinuations.append(continuation)
         }
@@ -296,11 +319,14 @@ enum JobState {
     case completed
     case canceling
     case canceled
+    case failing
+    case failed
 }
 
 enum JobEvent {
     case start
     case complete
+    case fail
     case cancel
     case childrenCompleted
 }
@@ -356,8 +382,7 @@ actor SwiftieScope {
                     try await block(childScope)
                     await newJob.complete()
                 } catch {
-                    await newJob.complete()
-                    await newJob.parent?.notifyChildFailed()
+                    await newJob.fail(error: error)
                 }
             },
             dispatcher: swiftieDispatcher
@@ -378,8 +403,7 @@ actor SwiftieScope {
                     await newJob.complete()
                     await deferred.complete(with: .success(result))
                 } catch {
-                    await newJob.complete()
-                    await newJob.parent?.notifyChildFailed()
+                    await newJob.fail(error: error)
                     await deferred.complete(with: .failure(error))
                 }
             },
@@ -441,6 +465,12 @@ actor Deferred<DataType> {
     var isCompleted: Bool {
         get async {
             await job.isCompleted
+        }
+    }
+    
+    var isFailed: Bool {
+        get async {
+            await job.isFailed
         }
     }
     
