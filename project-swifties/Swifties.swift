@@ -179,8 +179,16 @@ func interpret(trigger event: JobEvent, from currentState: JobState) -> JobState
  JOB
  */
 
+
+enum JobType {
+    case regular
+    case supervisor
+}
+
 actor Job: ContextElement {
     let parent: Job?
+    let type: JobType
+    
     private var children: [Job] = []
     private var state: JobState = .new
 
@@ -194,8 +202,9 @@ actor Job: ContextElement {
     
     var childCount: Int { children.count }
     
-    init(parent: Job?) {
+    init(parent: Job?, type: JobType = .regular) {
         self.parent = parent
+        self.type = type
     }
     
     @discardableResult
@@ -263,6 +272,8 @@ actor Job: ContextElement {
     }
     
     fileprivate func notifyChildFailed() async {
+        guard type != .supervisor else { return }
+        
         guard let parent else {
             await cancel()
             return
@@ -327,7 +338,7 @@ actor SwiftieScope {
         self.context = base
     }
     
-    private init(context: SwiftieContext, job: Job) {
+    fileprivate init(context: SwiftieContext, job: Job) {
         var base = context + job
         if context[SwiftieDispatcher.self] == nil {
             base = base + SwiftieDispatcherDefault()
@@ -408,6 +419,14 @@ actor SwiftieScope {
     func cancel() async {
         await rootJob.cancel()
     }
+    
+}
+
+func supervisorScope(context: SwiftieContext) -> SwiftieScope {
+    return SwiftieScope(
+        context: context,
+        job: Job(parent: nil, type: .supervisor)
+    )
 }
 
 /**

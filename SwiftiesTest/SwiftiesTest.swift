@@ -158,4 +158,51 @@ struct SwiftieTests {
         #expect(await failingJob.isCompleted)  // ← add
         #expect(await siblingJob.isCanceled)  // ← add
     }
+    
+    @Test func supervisorIsolatesChildFailures() async throws {
+        let scope = supervisorScope(context: SwiftieDispatchers.general)
+        
+        let failingJob = try await scope.launch { _ in
+            throw SwiftieError.failure
+        }
+        let siblingJob = try await scope.launch { _ in
+            try await Task.sleep(for: .seconds(2))
+        }
+        
+        await failingJob.join()
+        
+        #expect(await siblingJob.isCanceled == false)
+        #expect(await scope.rootJob.isCanceled == false)
+    }
+    
+    @Test func nestedSupervisorScope() async throws {
+        let outer = supervisorScope(context: SwiftieDispatchers.general)
+        
+        let outerJob = try await outer.launch { _ in
+            let inner = supervisorScope(context: SwiftieDispatchers.general)
+            
+            let failingJob = try await inner.launch { _ in
+                throw SwiftieError.failure
+            }
+            let siblingJob = try await inner.launch { _ in
+                try await Task.sleep(for: .seconds(2))
+            }
+            
+            await failingJob.join()
+            
+            // sibling should survive — inner is supervisor
+            #expect(await siblingJob.isCanceled == false)
+            #expect(await inner.rootJob.isCanceled == false)
+        }
+        
+        let outerSiblingJob = try await outer.launch { _ in
+            try await Task.sleep(for: .seconds(2))
+        }
+        
+        await outerJob.join()
+        
+        // outer scope unaffected too
+        #expect(await outerSiblingJob.isCanceled == false)
+        #expect(await outer.rootJob.isCanceled == false)
+    }
 }
