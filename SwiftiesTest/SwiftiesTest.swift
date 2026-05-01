@@ -159,9 +159,13 @@ struct SwiftieTests {
         await failingJob.join()
         await siblingJob.join()
         
+        print("HaykksiblingJob isCanceled: \(await siblingJob.isCanceled)")
+        print("HaykksiblingJob isFailed: \(await siblingJob.isFailed)")
+        print("HaykksiblingJob isCompleted: \(await siblingJob.isCompleted)")
         #expect(await scope.rootJob.isFailed)
         #expect(await failingJob.isFailed)  // ← add
         #expect(await siblingJob.isCanceled)  // ← add
+        
     }
     
     @Test func supervisorIsolatesChildFailures() async throws {
@@ -233,4 +237,59 @@ struct SwiftieTests {
         await outerJob.join()
         #expect(await outer.rootJob.isFailed)
     }
+    
+    // execute
+    
+    @Test func executeRunsWhenActive() async throws {
+        let job = Job(parent: nil)
+        await job.start()
+        let dispatched = await job.execute(
+            block: { },
+            dispatcher: SwiftieDispatcherDefault()
+        )
+        #expect(dispatched == true)
+    }
+
+    @Test func executeBlockedWhenNew() async throws {
+        let job = Job(parent: nil)
+        let dispatched = await job.execute(
+            block: { },
+            dispatcher: SwiftieDispatcherDefault()
+        )
+        #expect(dispatched == false)
+    }
+
+    @Test func executeBlockedWhenCanceled() async throws {
+        let job = Job(parent: nil)
+        await job.start()
+        await job.cancel()
+        let dispatched = await job.execute(
+            block: { },
+            dispatcher: SwiftieDispatcherDefault()
+        )
+        #expect(dispatched == false)
+    }
+
+    @Test func executeBlockedWhenFailed() async throws {
+        let job = Job(parent: nil)
+        await job.start()
+        await job.fail(error: SwiftieError.failure)
+        let dispatched = await job.execute(
+            block: { },
+            dispatcher: SwiftieDispatcherDefault()
+        )
+        #expect(dispatched == false)
+    }
+
+    @Test func executeBlockedWhenCompleted() async throws {
+        let job = Job(parent: nil)
+        await job.start()
+        await job.complete()
+        let dispatched = await job.execute(
+            block: { },
+            dispatcher: SwiftieDispatcherDefault()
+        )
+        #expect(dispatched == false)
+    }
+    
 }

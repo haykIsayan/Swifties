@@ -26,7 +26,7 @@ actor Job: ContextElement {
     
     var isCompleted: Bool { state == .completed }
     
-    var isCanceled: Bool { state == .canceled && (task == nil || task?.isCancelled == true) }
+    var isCanceled: Bool { state == .canceled }
     
     var isFailed: Bool { state == .failed }
     
@@ -46,10 +46,13 @@ actor Job: ContextElement {
         return true
     }
     
-    func execute(block: @escaping SwiftieDispatchBlock, dispatcher: some SwiftieDispatcher) async {
+    @discardableResult
+    func execute(block: @escaping SwiftieDispatchBlock, dispatcher: some SwiftieDispatcher) async -> Bool {
+        guard state == .active else { return false }
         self.task = dispatcher.dispatch {
             try await block()
         }
+        return true
     }
     
     @discardableResult
