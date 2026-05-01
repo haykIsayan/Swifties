@@ -92,9 +92,10 @@ actor Job: ContextElement {
         return true
     }
     
-    func fail(error: Error) async {
+    @discardableResult
+    func fail(error: Error) async -> Bool {
         guard let failingState = interpret(trigger: .fail, from: state) else {
-            return
+            return false
         }
         state = failingState
         self.error = error
@@ -102,13 +103,14 @@ actor Job: ContextElement {
             await child.cancel()
         }
         guard let failedState = interpret(trigger: .childrenCompleted, from: state) else {
-            return
+            return false
         }
         state = failedState
         
         await parent?.notifyChildFailed(error: error)
         
         resumeAndCleanContinuations()
+        return true
     }
     
     private func resumeAndCleanContinuations() {
