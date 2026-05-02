@@ -9,7 +9,7 @@
 typealias SwiftieDispatchBlock = @Sendable () async throws -> Void
 
 protocol SwiftieDispatcher: ContextElement {
-    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error>
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> SwiftieExecutable
 }
 
 extension SwiftieDispatcher {
@@ -17,35 +17,51 @@ extension SwiftieDispatcher {
 }
 
 struct SwiftieDispatcherIO: SwiftieDispatcher {
-    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error> {
-        return Task(priority: .utility) {
-            try await block()
-        }
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> SwiftieExecutable {
+        return SwiftieExecutor(
+            taskBuilder: {
+                Task(priority: .utility) {
+                    try await block()
+                }
+            }
+        )
     }
 }
 
 struct SwiftieDispatcherMain: SwiftieDispatcher {
-    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error> {
-        return Task { @MainActor in
-            try await block()
-        }
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> SwiftieExecutable {
+        return SwiftieExecutor(
+            taskBuilder: {
+                Task { @MainActor in
+                    try await block()
+                }
+            }
+        )
     }
 }
 
 struct SwiftieDispatcherDefault: SwiftieDispatcher {
-    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error> {
-        return Task(priority: .userInitiated) {
-            try await block()
-        }
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> SwiftieExecutable {
+        return SwiftieExecutor(
+            taskBuilder: {
+                Task(priority: .userInitiated) {
+                    try await block()
+                }
+            }
+        )
     }
 }
 
 
 struct SwiftieDispatcherUnconfined: SwiftieDispatcher {
-    func dispatch(block: @escaping SwiftieDispatchBlock) -> Task<Void, any Error> {
-        return Task {
-            try await block()
-        }
+    func dispatch(block: @escaping SwiftieDispatchBlock) -> SwiftieExecutable {
+        return SwiftieExecutor(
+            taskBuilder: {
+                Task {
+                    try await block()
+                }
+            }
+        )
     }
 }
 

@@ -17,12 +17,12 @@ actor Job: ContextElement {
     private var children: [Job] = []
     
     private var state: JobState = .new
-
-    private var joinContinuations: [CheckedContinuation<Void, Never>] = []
     
-    private var task: Task<Void, Error>?
+    private var executable: SwiftieExecutable?
     
     private var error: Error? = nil
+    
+    private var joinContinuations: [CheckedContinuation<Void, Never>] = []
     
     var isCompleted: Bool { state == .completed }
     
@@ -49,9 +49,12 @@ actor Job: ContextElement {
     @discardableResult
     func execute(block: @escaping SwiftieDispatchBlock, dispatcher: some SwiftieDispatcher) async -> Bool {
         guard state == .active else { return false }
-        self.task = dispatcher.dispatch {
+        
+        self.executable = dispatcher.dispatch {
             try await block()
         }
+        await executable?.execute()
+        
         return true
     }
     
@@ -75,7 +78,7 @@ actor Job: ContextElement {
     
     @discardableResult
     func cancel() async -> Bool {
-        task?.cancel()
+        await executable?.cancel()
         guard let cancelingState = interpret(trigger: .cancel, from: state) else {
             return false
         }
