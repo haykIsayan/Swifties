@@ -32,6 +32,11 @@ actor Job: ContextElement {
     
     var childCount: Int { children.count }
     
+    var failureError: Error? {
+        guard state == .failed else { return nil }
+        return error
+    }
+    
     init(parent: Job?, type: JobType = .regular) {
         self.parent = parent
         self.type = type
